@@ -1,17 +1,4 @@
 import requests
-def debug_api():
-    endpoints = [
-        f"https://api.linkedin.com/v2/me",
-        f"https://api.linkedin.com/v2/organizations/{COMPANY_ID}",
-        f"https://api.linkedin.com/v2/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{COMPANY_ID}",
-    ]
-    for url in endpoints:
-        r = requests.get(url, headers=headers)
-        print(f"[{r.status_code}] {url}")
-        print(r.text[:300])
-        print("---")
-
-debug_api()
 import json
 import os
 from datetime import datetime, timedelta
@@ -24,6 +11,21 @@ headers = {
     "X-Restli-Protocol-Version": "2.0.0",
     "LinkedIn-Version": "202401"
 }
+
+# 디버그: API 응답 확인
+def debug_api():
+    endpoints = [
+        "https://api.linkedin.com/v2/me",
+        f"https://api.linkedin.com/v2/organizations/{COMPANY_ID}",
+        f"https://api.linkedin.com/v2/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{COMPANY_ID}",
+    ]
+    for url in endpoints:
+        r = requests.get(url, headers=headers)
+        print(f"[{r.status_code}] {url}")
+        print(r.text[:300])
+        print("---")
+
+debug_api()
 
 def get_follower_stats():
     url = f"https://api.linkedin.com/v2/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{COMPANY_ID}"
@@ -82,7 +84,6 @@ def get_post_stats(share_urns):
         return r.json().get("elements", [])
     return []
 
-# --- Collect all data ---
 print("Fetching LinkedIn data...")
 
 follower_data = get_follower_stats()
@@ -93,7 +94,6 @@ posts = get_posts()
 share_urns = [p.get("activity") or p.get("id", "") for p in posts[:10]]
 post_stats = get_post_stats(share_urns)
 
-# --- Aggregate totals ---
 total_followers = 0
 for f in follower_data:
     total_followers += f.get("followerCounts", {}).get("organicFollowerCount", 0)
@@ -107,49 +107,28 @@ total_unique = sum(
     e.get("totalPageStatistics", {}).get("views", {}).get("allPageViews", {}).get("uniquePageViews", 0)
     for e in page_stats
 )
+total_impressions = sum(e.get("totalShareStatistics", {}).get("impressionCount", 0) for e in share_stats)
+total_clicks = sum(e.get("totalShareStatistics", {}).get("clickCount", 0) for e in share_stats)
+total_likes = sum(e.get("totalShareStatistics", {}).get("likeCount", 0) for e in share_stats)
+total_comments = sum(e.get("totalShareStatistics", {}).get("commentCount", 0) for e in share_stats)
+total_shares = sum(e.get("totalShareStatistics", {}).get("shareCount", 0) for e in share_stats)
 
-total_impressions = sum(
-    e.get("totalShareStatistics", {}).get("impressionCount", 0)
-    for e in share_stats
-)
-total_clicks = sum(
-    e.get("totalShareStatistics", {}).get("clickCount", 0)
-    for e in share_stats
-)
-total_likes = sum(
-    e.get("totalShareStatistics", {}).get("likeCount", 0)
-    for e in share_stats
-)
-total_comments = sum(
-    e.get("totalShareStatistics", {}).get("commentCount", 0)
-    for e in share_stats
-)
-total_shares = sum(
-    e.get("totalShareStatistics", {}).get("shareCount", 0)
-    for e in share_stats
-)
-
-# engagement rate
 engagement_rate = 0
 if total_impressions > 0:
     engagement_rate = round((total_likes + total_comments + total_shares + total_clicks) / total_impressions * 100, 2)
 
-# --- Daily trend data ---
 daily_views = []
 for e in page_stats:
     ts = e.get("timeRange", {}).get("start", 0)
     views = e.get("totalPageStatistics", {}).get("views", {}).get("allPageViews", {}).get("pageViews", 0)
-    date_str = datetime.fromtimestamp(ts / 1000).strftime("%m/%d")
-    daily_views.append({"date": date_str, "views": views})
+    daily_views.append({"date": datetime.fromtimestamp(ts / 1000).strftime("%m/%d"), "views": views})
 
 daily_impressions = []
 for e in share_stats:
     ts = e.get("timeRange", {}).get("start", 0)
     impressions = e.get("totalShareStatistics", {}).get("impressionCount", 0)
-    date_str = datetime.fromtimestamp(ts / 1000).strftime("%m/%d")
-    daily_impressions.append({"date": date_str, "impressions": impressions})
+    daily_impressions.append({"date": datetime.fromtimestamp(ts / 1000).strftime("%m/%d"), "impressions": impressions})
 
-# --- Post list ---
 post_list = []
 for i, p in enumerate(posts):
     text = ""
@@ -158,13 +137,10 @@ for i, p in enumerate(posts):
     commentary = share_content.get("shareCommentary", {})
     if commentary:
         text = commentary.get("text", "")[:100]
-
     stat = post_stats[i] if i < len(post_stats) else {}
     ts_stats = stat.get("totalShareStatistics", {})
-
     created = p.get("created", {}).get("time", 0)
     date_str = datetime.fromtimestamp(created / 1000).strftime("%Y-%m-%d") if created else ""
-
     post_list.append({
         "id": p.get("id", ""),
         "text": text,
@@ -176,7 +152,6 @@ for i, p in enumerate(posts):
         "shares": ts_stats.get("shareCount", 0),
     })
 
-# --- Save output ---
 output = {
     "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     "overview": {
