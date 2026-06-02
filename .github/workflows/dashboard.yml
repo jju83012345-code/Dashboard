@@ -1,0 +1,38 @@
+name: LinkedIn Dashboard Update
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 매일 오전 10시 KST (UTC+9)
+  workflow_dispatch:       # 수동 실행 버튼
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-linkedin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch LinkedIn data
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        run: python fetch_linkedin.py
+
+      - name: Commit and push data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add docs/data/linkedin.json
+          git diff --staged --quiet || git commit -m "📊 LinkedIn data update $(date +'%Y-%m-%d')"
+          git push
