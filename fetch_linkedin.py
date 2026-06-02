@@ -1,4 +1,17 @@
 import requests
+def debug_api():
+    endpoints = [
+        f"https://api.linkedin.com/v2/me",
+        f"https://api.linkedin.com/v2/organizations/{COMPANY_ID}",
+        f"https://api.linkedin.com/v2/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:{COMPANY_ID}",
+    ]
+    for url in endpoints:
+        r = requests.get(url, headers=headers)
+        print(f"[{r.status_code}] {url}")
+        print(r.text[:300])
+        print("---")
+
+debug_api()
 import json
 import os
 from datetime import datetime, timedelta
